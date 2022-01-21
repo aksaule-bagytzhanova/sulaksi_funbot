@@ -1,5 +1,5 @@
 from aiogram import types
-from . app import dp
+from . app import dp, bot
 from . keyboards import inline_kb
 from . states import GameStates
 from . data_fetcher import get_random
@@ -13,6 +13,25 @@ async def train_ten(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['step'] = 1
         data['answer'] = res.get('part_of_word')
-        data['word'] = res.get(' word')
+        data['word'] = res.get('word')
 
-        await message.reply("train_ten", reply_markup=inline_kb)
+        await message.reply(f"{ data['step']} of 10, English words list {data['word']}", reply_markup=inline_kb)
+
+
+@dp.callback_query_handler(lambda c: c.data in ['noun', 'verb', 'adjective', 'pronoun', 'adverb', 'numeral'], state=GameStates.random_ten)
+async def button_click_call_back(callback_query: types.CallbackQuery, state: FSMContext):
+    await bot.answer_callback_query(callback_query.id)
+    answer = callback_query.data
+    async with state.proxy() as data:
+        if answer == data.get('answer'):
+            res = await get_random()
+            data['step'] += 1
+            data['answer'] = res.get('part_of_word')
+            data['word'] = res.get('word')
+            if data['step'] > 10:
+                await bot.send_message(callback_query.from_user.id, "The game is over!!!")
+                await GameStates.start.set()
+            else:
+                await bot.send_message(callback_query.from_user.id, 'Correct\n' + f"{ data['step']} of 10, English words list {data['word']}", reply_markup=inline_kb)
+        else:
+            await bot.send_message(callback_query.from_user.id, f'No\n', reply_markup=inline_kb)
